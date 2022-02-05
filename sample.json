@@ -1,0 +1,49 @@
+{
+    "folder": "/exact/path/to/folder/with/trailing/slash/",
+    "sync-folder": "/not-in-use-yet/",
+    "databases": [
+        {
+            "name": "a-z0-9_--name-of-project-used-as-folder-name",
+            "enabled": true,
+            "interval": {
+                "daily": 7,
+                "weekly": 4,
+                "monthly": 1
+            },
+            "container": "name-of-docker-container",
+            "user": {
+                "type": "constant",
+                "value": "A constant variable that is used for the user variable"
+            },
+            "password": {
+                "type": "env",
+                "value": "NAME_OF_CONTAINER_ENV"
+            },
+            "database": {
+                "type": "env",
+                "value": "MYSQL_DATABASE"
+            }
+        }
+    ],
+    "files": [
+        {
+            "name": "data-name",
+            "enabled": true,
+            "interval": {
+                "daily": 4,
+                "weekly": 4,
+                "monthly": 12
+            },
+            "command": "tar --exclude=\"logs\" -cvf lijstr.tar /home/stoux/apps/lijstr",
+            "files": [
+                "/an-absolute-path-to-the-folder/"
+            ],
+            "exclude": [
+                "either-a-general-pattern.*.or",
+                "/an-absolute-path-to-the-folder/exact-match"
+            ],
+            "compress": true,
+            "rotate-synced-monthly-backups": false
+        }
+    ]
+}
