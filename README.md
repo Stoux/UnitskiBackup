@@ -32,7 +32,8 @@ but who knows. You can always try and ask.
 
 Run `GOOS=[platform] GOARCH=[arch] go build -v ./`.
 
-Example for Linux distro /w AMD based cpu: `GOOS=linux GOARCH=amd64 go build -v ./`
+- Common linux servers: `GOOS=linux GOARCH=amd64 go build -v -o build/unitski-backup-linux-amd64 ./`
+- Intel-based Mac: `GOOS=linux GOARCH=amd64 go build -v -o build/unitski-backup-macos-amd64 ./`
 
 ## TODOs
 
