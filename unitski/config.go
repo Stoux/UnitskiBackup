@@ -8,8 +8,10 @@ import (
 )
 
 type BackupConfig struct {
-	Folder    string                 `json:"folder"`
-	Databases []BackupConfigDatabase `json:"databases"`
+	Folder     string                 `json:"folder"`
+	SyncFolder string                 `json:"sync-folder"`
+	Databases  []BackupConfigDatabase `json:"databases"`
+	Files      []BackupConfigFiles    `json:"files"`
 }
 
 type BackupConfigDatabase struct {
@@ -20,6 +22,16 @@ type BackupConfigDatabase struct {
 	User      BackupVariable `json:"user"`
 	Password  BackupVariable `json:"password"`
 	Database  BackupVariable `json:"database"`
+}
+
+type BackupConfigFiles struct {
+	Name                       string         `json:"name"`
+	Enabled                    bool           `json:"enabled"`
+	Interval                   BackupInterval `json:"interval"`
+	Files                      []string       `json:"files"`
+	Exclude                    []string       `json:"exclude"`
+	Compress                   bool           `json:"compress"`
+	RotateSyncedMonthlyBackups bool           `json:"rotate-synced-monthly-backups"`
 }
 
 type BackupInterval struct {
@@ -79,7 +91,10 @@ func validate(config BackupConfig) {
 	}
 
 	// => Other
-	// TODO: Check non-database backups
+	for _, fileBackup := range config.Files {
+		checkName(allowedNameFormat, knownNames, fileBackup.Name)
+		knownNames[fileBackup.Name] = true
+	}
 
 	// Check if the target folder exists, is writable, is an absolute path & has trailing /
 	folder := config.Folder

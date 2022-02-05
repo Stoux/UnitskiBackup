@@ -3,7 +3,6 @@ package unitski
 import (
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -304,18 +303,4 @@ func RotateFile(createdFilePath string, shouldBackup ShouldBackup, interval Back
 	}
 
 	return nil
-}
-
-// Compress the given file using gzip @ max compression rating
-// Returns the name of the compressed file.
-func Compress(file string) (compressedFile string, err error) {
-	p := exec.Command(
-		"gzip",
-		"-9",
-		file,
-	)
-	if err := p.Run(); err != nil {
-		return "", err
-	}
-	return file + ".gz", nil
 }

@@ -11,6 +11,7 @@ import (
 
 func main() {
 	// TODO: Add arguments for testing the config file
+	// TODO: Add interactive CLI to add & test a backup configuration
 
 	fmt.Println("Running...")
 	unitski.SetLogger()
@@ -24,6 +25,7 @@ func main() {
 	cli, ctx := unitski.InitDocker()
 
 	databases(cli, ctx, config)
+	files(config)
 
 	// Check if required commands are available
 	// Start 2 threads: 1 for processing backups, 1 for syncing to backup
@@ -36,6 +38,11 @@ func databases(cli *client.Client, ctx context.Context, config unitski.BackupCon
 
 	// Loop through each database
 	for _, database := range config.Databases {
+		if !database.Enabled {
+			log.Println("Skipping backup of database: " + database.Name + " (is disabled)")
+			continue
+		}
+
 		log.Println("Starting backup of database: " + database.Name)
 
 		// Create the project folder if not done yet & check if we should run a backup
@@ -79,6 +86,62 @@ func databases(cli *client.Client, ctx context.Context, config unitski.BackupCon
 			log.Print("Error while rotating file: " + err.Error())
 			continue
 		}
+
+		// TODO: Queue sync
+
+		// All done?
+	}
+}
+
+func files(config unitski.BackupConfig) {
+	date := time.Now().Format("2006-01-02")
+
+	// Loop through each database
+	for _, fileBackup := range config.Files {
+		if !fileBackup.Enabled {
+			log.Println("Skipping files backup: " + fileBackup.Name + " (is disabled)")
+			continue
+		}
+
+		log.Println("Starting backup of files: " + fileBackup.Name)
+
+		// Create the project folder if not done yet & check if we should run a backup
+		projectFolder := config.Folder + fileBackup.Name + "/"
+		shouldBackup, err := unitski.CheckProjectFolder(projectFolder, fileBackup.Interval)
+		if err != nil {
+			// TODO: Sentry
+			log.Println(err.Error())
+			continue
+		} else if !shouldBackup.Any() {
+			log.Println("No backup required today for: " + fileBackup.Name)
+			continue
+		}
+
+		// Determine the target tar file
+		tarBallFile := projectFolder + fileBackup.Name + "_" + date + ".tar"
+		if fileBackup.Compress {
+			tarBallFile = tarBallFile + ".gz"
+		}
+
+		// Create the tar ball
+		log.Println("Creating tar ball: " + tarBallFile)
+		err = unitski.CreateTarBall(tarBallFile, fileBackup.Files, fileBackup.Exclude)
+		if err != nil {
+			// TODO Sentry
+			log.Print("Error while creating tar ball: " + err.Error())
+			continue
+		}
+
+		// Rotate the file through
+		log.Println("Rotating result file into backups")
+		err = unitski.RotateFile(tarBallFile, shouldBackup, fileBackup.Interval)
+		if err != nil {
+			// TODO Sentry
+			log.Print("Error while rotating file: " + err.Error())
+			continue
+		}
+
+		// TODO: Queue sync
 
 		// All done?
 	}
