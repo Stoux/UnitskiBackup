@@ -140,7 +140,7 @@ func (f *BackupFolder) getSymlinkFor(file string) (symlinkPath string, err error
 	symlinkPath = f.folder + file
 
 	// Check if the file exists in this folder
-	if stat, fileError := os.Lstat(symlinkPath); fileError == nil {
+	if stat, err := os.Lstat(symlinkPath); err == nil {
 		// We have the file, it should be a symlink
 		if stat.Mode()&os.ModeSymlink == os.ModeSymlink {
 			return symlinkPath, err
