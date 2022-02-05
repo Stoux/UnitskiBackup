@@ -10,6 +10,7 @@ import (
 	"unitski-backup/unitski"
 )
 
+// Sync will trigger a full sync of all databases & files in the given config file.
 func Sync(configFilePath string) {
 	fmt.Println("Running...")
 	unitski.SetLogger()
@@ -17,11 +18,13 @@ func Sync(configFilePath string) {
 
 	// Load config
 	config := unitski.LoadConfig(configFilePath)
-	log.Println("Databases", len(config.Databases))
 
+	// Init docker
 	cli, ctx := unitski.InitDocker()
 
+	// Backup DBs
 	databases(cli, ctx, config)
+	// Backup files
 	files(config)
 
 	// TODO: Async

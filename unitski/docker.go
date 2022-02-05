@@ -1,9 +1,10 @@
 package unitski
 
 import (
+	"bufio"
 	"context"
-	"fmt"
 	"github.com/docker/docker/client"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -29,7 +30,7 @@ func InitDocker() (*client.Client, context.Context) {
 }
 
 // DumpMySqlDatabase dumps the database from a docker container that is running MySQL/MariaDB
-func DumpMySqlDatabase(cli *client.Client, ctx context.Context, config BackupConfigDatabase, dumpToFile string) error {
+func DumpMySqlDatabase(cli *client.Client, ctx context.Context, config BackupConfigDatabase, dumpToFile string) (err error) {
 	// Get all information about the container
 	containerId := config.Container
 	container, err := cli.ContainerInspect(ctx, containerId)
@@ -75,22 +76,35 @@ func DumpMySqlDatabase(cli *client.Client, ctx context.Context, config BackupCon
 		"-p"+password+"",
 		database,
 	)
-	dump.Stdout = outfile
-	dump.Stderr = os.Stderr
-	fmt.Println("Dumping DB "+database+" from container "+containerId, dump.Args)
 
+	// Output should be to the file
+	dump.Stdout = outfile
+
+	// Capture any error output
+	stderr, err := dump.StderrPipe()
+	if err != nil {
+		return err
+	}
+
+	// Run the command
 	err = dump.Start()
 	if err != nil {
 		_ = os.Remove(dumpToFile)
 		return err
 	}
-	result := dump.Wait()
-	if result != nil {
-		_ = os.Remove(dumpToFile)
-		return err
+	defer func() {
+		if err = dump.Wait(); err != nil {
+			_ = os.Remove(dumpToFile)
+		}
+	}()
+
+	// Read any possible error lines
+	errBuffer := bufio.NewScanner(stderr)
+	for errBuffer.Scan() {
+		log.Println(errBuffer.Text())
 	}
 
-	return nil
+	return err
 }
 
 func parseEnvVariables(env []string) map[string]string {
