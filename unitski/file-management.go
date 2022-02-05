@@ -46,6 +46,50 @@ func (fc *FolderCreator) checkOrCreate(subFolder string, name string) {
 	}
 }
 
+func (fc *FolderCreator) checkIfExists(subFolder string, file string) (bool, error) {
+	file = fc.root + subFolder + file
+	if _, err := os.Stat(file); err == nil {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else {
+		return false, err
+	}
+}
+
+func (fc *FolderCreator) checkShouldBackup(
+	subFolder string,
+	file string,
+	interval int,
+	shouldBackupToday func() bool,
+) (backup bool) {
+	// Don't backup when there's no interval
+	if fc.err != nil || interval <= 0 {
+		return false
+	}
+
+	var err error
+
+	// Check if the file already exists
+	if exists, err := fc.checkIfExists(subFolder, file); err == nil && !exists {
+		// Doesn't exist yet, check if we should make a back-up (today)
+		if backup = shouldBackupToday(); !backup {
+			// We shouldn't back-up today... but we might still want to if there are no back-ups yet?
+			if previousBackups, err := getPreviousBackups(fc.root + subFolder); err == nil {
+				backup = len(previousBackups) == 0
+			}
+		}
+	} else if exists {
+		log.Println("File " + subFolder + file + " already exists")
+	}
+
+	if err != nil {
+		fc.err = err
+	}
+
+	return backup
+}
+
 type ShouldBackup struct {
 	daily   bool
 	weekly  bool
@@ -57,7 +101,7 @@ func (sb *ShouldBackup) Any() bool {
 }
 
 // CheckProjectFolder checks whether the project folder is correctly backed-up & whether a backup should take place.
-func CheckProjectFolder(projectFolder string, interval BackupInterval) (shouldBackup ShouldBackup, err error) {
+func CheckProjectFolder(projectFolder string, filename string, interval BackupInterval) (shouldBackup ShouldBackup, err error) {
 	shouldBackup = ShouldBackup{}
 
 	// Create the project folder structure if not done yet
@@ -70,42 +114,23 @@ func CheckProjectFolder(projectFolder string, interval BackupInterval) (shouldBa
 		return shouldBackup, creator.err
 	}
 
-	// Always backup if there's a daily backup set
-	if interval.Daily > 0 {
-		shouldBackup.daily = true
-	}
-
-	// Check if it's a monday or if there's no backup yet
-	if interval.Weekly > 0 {
-		if time.Now().Weekday() == time.Monday {
-			shouldBackup.weekly = true
-		} else {
-			if backups, err := getPreviousBackups(projectFolder + weeklyDir); err == nil {
-				shouldBackup.weekly = len(backups) == 0
-			} else {
-				return shouldBackup, err
-			}
-		}
-	}
-
-	// Check if it's the first of the month or if there's no backup yet
-	if interval.Monthly > 0 {
-		if time.Now().Day() == 1 {
-			shouldBackup.monthly = true
-		} else {
-			if backups, err := getPreviousBackups(projectFolder + monthlyDir); err == nil {
-				shouldBackup.monthly = len(backups) == 0
-			} else {
-				return shouldBackup, err
-			}
-		}
-	}
-
-	if !shouldBackup.Any() {
+	// Check that at least one interval is active
+	if interval.Daily <= 0 && interval.Weekly <= 0 && interval.Monthly <= 0 {
 		return shouldBackup, &FileError{"All intervals have 0, this backup will never run!"}
 	}
 
-	return shouldBackup, nil
+	// Check whether backups should be made
+	shouldBackup.daily = creator.checkShouldBackup(dailyDir, filename, interval.Daily, func() bool {
+		return true // Every day
+	})
+	shouldBackup.weekly = creator.checkShouldBackup(weeklyDir, filename, interval.Weekly, func() bool {
+		return time.Now().Weekday() == time.Monday // Every monday
+	})
+	shouldBackup.monthly = creator.checkShouldBackup(monthlyDir, filename, interval.Monthly, func() bool {
+		return time.Now().Day() == 1 // First of the month
+	})
+
+	return shouldBackup, creator.err
 }
 
 func getPreviousBackups(folder string) (hasBackup []string, err error) {

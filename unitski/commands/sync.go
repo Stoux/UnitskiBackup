@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/docker/docker/client"
 	"log"
+	"path/filepath"
 	"time"
 	"unitski-backup/unitski"
 )
@@ -42,9 +43,12 @@ func databases(cli *client.Client, ctx context.Context, config unitski.BackupCon
 
 		log.Println("Starting backup of database: " + database.Name)
 
-		// Create the project folder if not done yet & check if we should run a backup
+		// Determine the dump file
 		projectFolder := config.Folder + database.Name + "/"
-		shouldBackup, err := unitski.CheckProjectFolder(projectFolder, database.Interval)
+		dumpToFile := projectFolder + database.Name + "_" + date + ".sql"
+
+		// Create the project folder if not done yet & check if we should run a backup
+		shouldBackup, err := unitski.CheckProjectFolder(projectFolder, filepath.Base(dumpToFile+".gz"), database.Interval)
 		if err != nil {
 			// TODO: Sentry
 			log.Println(err.Error())
@@ -53,9 +57,6 @@ func databases(cli *client.Client, ctx context.Context, config unitski.BackupCon
 			log.Println("No backup required today for: " + database.Name)
 			continue
 		}
-
-		// Determine the dump file
-		dumpToFile := projectFolder + database.Name + "_" + date + ".sql"
 
 		// Execute the dump
 		log.Println("Starting dump to file: " + dumpToFile)
@@ -102,9 +103,15 @@ func files(config unitski.BackupConfig) {
 
 		log.Println("Starting backup of files: " + fileBackup.Name)
 
-		// Create the project folder if not done yet & check if we should run a backup
+		// Determine the target tar file
 		projectFolder := config.Folder + fileBackup.Name + "/"
-		shouldBackup, err := unitski.CheckProjectFolder(projectFolder, fileBackup.Interval)
+		tarBallFile := projectFolder + fileBackup.Name + "_" + date + ".tar"
+		if fileBackup.Compress {
+			tarBallFile = tarBallFile + ".gz"
+		}
+
+		// Create the project folder if not done yet & check if we should run a backup
+		shouldBackup, err := unitski.CheckProjectFolder(projectFolder, filepath.Base(tarBallFile), fileBackup.Interval)
 		if err != nil {
 			// TODO: Sentry
 			log.Println(err.Error())
@@ -112,12 +119,6 @@ func files(config unitski.BackupConfig) {
 		} else if !shouldBackup.Any() {
 			log.Println("No backup required today for: " + fileBackup.Name)
 			continue
-		}
-
-		// Determine the target tar file
-		tarBallFile := projectFolder + fileBackup.Name + "_" + date + ".tar"
-		if fileBackup.Compress {
-			tarBallFile = tarBallFile + ".gz"
 		}
 
 		// Create the tar ball
