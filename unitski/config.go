@@ -68,7 +68,10 @@ func loadFromFile(path string) BackupConfig {
 
 	var config BackupConfig
 	byteValue, err := ioutil.ReadAll(jsonFile)
-	json.Unmarshal(byteValue, &config)
+	err = json.Unmarshal(byteValue, &config)
+	if err != nil {
+		panic(err)
+	}
 
 	return config
 }
