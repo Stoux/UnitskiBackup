@@ -9,6 +9,7 @@ but who knows. You can always try and ask.
 - Ability to dump, tar & compress the database from Docker MySQL/MariaDB containers
 - Ability to dump, tar & optionally compress files on a server
 - Automatic backup file rotation with the ability to specify how many backups should be kept (daily, weekly, monthly)
+- Sentry error reporting
 
 ## Instructions
 
@@ -42,4 +43,4 @@ Run `GOOS=[platform] GOARCH=[arch] go build -v ./`.
 - Ability to set compression level through the config
 - Ability to add a new database/file backup through the CLI
 - Ability to test the configuration file through the CLI
-- Sentry error reporting
+- Better logging library 

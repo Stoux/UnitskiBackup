@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/docker/docker/client"
+	"github.com/getsentry/sentry-go"
 	"log"
 	"path/filepath"
 	"time"
@@ -31,6 +32,7 @@ func Sync(configFilePath string) {
 	// Check if required commands are available
 	// Start 2 threads: 1 for processing backups, 1 for syncing to backup
 
+	log.Println("---- All done!")
 	fmt.Println("Done.")
 }
 
@@ -40,11 +42,11 @@ func databases(cli *client.Client, ctx context.Context, config unitski.BackupCon
 	// Loop through each database
 	for _, database := range config.Databases {
 		if !database.Enabled {
-			log.Println("Skipping backup of database: " + database.Name + " (is disabled)")
+			log.Println("[info] Skipping backup of database: " + database.Name + " (is disabled)")
 			continue
 		}
 
-		log.Println("Starting backup of database: " + database.Name)
+		log.Println("[info] Starting backup of database: " + database.Name)
 
 		// Determine the dump file
 		projectFolder := config.Folder + database.Name + "/"
@@ -53,29 +55,29 @@ func databases(cli *client.Client, ctx context.Context, config unitski.BackupCon
 		// Create the project folder if not done yet & check if we should run a backup
 		shouldBackup, err := unitski.CheckProjectFolder(projectFolder, filepath.Base(dumpToFile+".gz"), database.Interval)
 		if err != nil {
-			// TODO: Sentry
-			log.Println(err.Error())
+			log.Println("[error] ", err.Error())
+			sentry.CaptureException(err)
 			continue
 		} else if !shouldBackup.Any() {
-			log.Println("No backup required today for: " + database.Name)
+			log.Println("[info] No backup required today for: " + database.Name)
 			continue
 		}
 
 		// Execute the dump
-		log.Println("Starting dump to file: " + dumpToFile)
+		log.Println("[info] Starting dump to file: " + dumpToFile)
 		err = unitski.DumpMySqlDatabase(cli, ctx, database, dumpToFile)
 		if err != nil {
-			// TODO: Sentry log this
-			log.Println("Failed to dump MySQL database of " + database.Name + ": " + err.Error())
+			log.Println("[error] Failed to dump MySQL database of " + database.Name + ": " + err.Error())
+			sentry.CaptureException(err)
 			continue
 		}
 
 		// Compress the dump
-		log.Println("Compressing file: " + dumpToFile)
+		log.Println("[info] Compressing file: " + dumpToFile)
 		compressedFile, err := unitski.Compress(dumpToFile)
 		if err != nil {
-			// TODO Sentry
-			log.Print("Failed to compress file: " + dumpToFile + " | Err: " + err.Error())
+			log.Print("[error] Failed to compress file: " + dumpToFile + " | Err: " + err.Error())
+			sentry.CaptureException(err)
 			continue
 		}
 
@@ -83,8 +85,8 @@ func databases(cli *client.Client, ctx context.Context, config unitski.BackupCon
 		log.Println("Rotating result file into backups")
 		err = unitski.RotateFile(compressedFile, shouldBackup, database.Interval)
 		if err != nil {
-			// TODO Sentry
-			log.Print("Error while rotating file: " + err.Error())
+			log.Print("[error] Error while rotating file: " + err.Error())
+			sentry.CaptureException(err)
 			continue
 		}
 
@@ -100,11 +102,11 @@ func files(config unitski.BackupConfig) {
 	// Loop through each database
 	for _, fileBackup := range config.Files {
 		if !fileBackup.Enabled {
-			log.Println("Skipping files backup: " + fileBackup.Name + " (is disabled)")
+			log.Println("[info] Skipping files backup: " + fileBackup.Name + " (is disabled)")
 			continue
 		}
 
-		log.Println("Starting backup of files: " + fileBackup.Name)
+		log.Println("[info] Starting backup of files: " + fileBackup.Name)
 
 		// Determine the target tar file
 		projectFolder := config.Folder + fileBackup.Name + "/"
@@ -116,29 +118,29 @@ func files(config unitski.BackupConfig) {
 		// Create the project folder if not done yet & check if we should run a backup
 		shouldBackup, err := unitski.CheckProjectFolder(projectFolder, filepath.Base(tarBallFile), fileBackup.Interval)
 		if err != nil {
-			// TODO: Sentry
-			log.Println(err.Error())
+			log.Println("[error] ", err.Error())
+			sentry.CaptureException(err)
 			continue
 		} else if !shouldBackup.Any() {
-			log.Println("No backup required today for: " + fileBackup.Name)
+			log.Println("[info] No backup required today for: " + fileBackup.Name)
 			continue
 		}
 
 		// Create the tar ball
-		log.Println("Creating tar ball: " + tarBallFile)
+		log.Println("[info] Creating tar ball: " + tarBallFile)
 		err = unitski.CreateTarBall(tarBallFile, fileBackup.Files, fileBackup.Exclude)
 		if err != nil {
-			// TODO Sentry
-			log.Print("Error while creating tar ball: " + err.Error())
+			log.Print("[error] Error while creating tar ball: " + err.Error())
+			sentry.CaptureException(err)
 			continue
 		}
 
 		// Rotate the file through
-		log.Println("Rotating result file into backups")
+		log.Println("[info] Rotating result file into backups")
 		err = unitski.RotateFile(tarBallFile, shouldBackup, fileBackup.Interval)
 		if err != nil {
-			// TODO Sentry
-			log.Print("Error while rotating file: " + err.Error())
+			log.Print("[error] Error while rotating file: " + err.Error())
+			sentry.CaptureException(err)
 			continue
 		}
 
